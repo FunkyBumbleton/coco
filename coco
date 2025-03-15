@@ -1,0 +1,206 @@
+#!/bin/bash
+
+# Configuration file path
+CONFIG_FILE="$HOME/.config/coco/config"
+CONFIG_DIR="$HOME/.config/coco"
+
+# Initialize arrays for extensions
+declare -a EXTENSIONS
+declare -a EXCLUDED
+
+# Function to load configuration
+load_config() {
+    # Create config directory and default config if needed
+    if [ ! -d "$CONFIG_DIR" ]; then
+        mkdir -p "$CONFIG_DIR"
+    fi
+
+    if [ ! -f "$CONFIG_FILE" ]; then
+        # Comprehensive list of common programming file extensions
+        echo "EXTENSIONS_LIST=\"py js ts html css scss sass java c cpp cc cxx h hpp hh hxx sh bash zsh rb pl php go rs swift kt scala lua sql json xml yml yaml md markdown txt tex\"" > "$CONFIG_FILE"
+        echo "EXCLUDED_LIST=\"\"" >> "$CONFIG_FILE"
+    fi
+
+    # Source the config file
+    source "$CONFIG_FILE"
+
+    # Convert space-separated strings to arrays
+    read -ra EXTENSIONS <<< "$EXTENSIONS_LIST"
+    read -ra EXCLUDED <<< "$EXCLUDED_LIST"
+}
+
+# Function to save configuration
+save_config() {
+    # Convert arrays to space-separated strings
+    local extensions_str="${EXTENSIONS[*]}"
+    local excluded_str="${EXCLUDED[*]}"
+
+    echo "EXTENSIONS_LIST=\"$extensions_str\"" > "$CONFIG_FILE"
+    echo "EXCLUDED_LIST=\"$excluded_str\"" >> "$CONFIG_FILE"
+}
+
+# Function to show usage
+show_usage() {
+    echo "Usage: coco [options]"
+    echo "Options:"
+    echo "  -h, --help                Show this help message"
+    echo "  -E EXT, --exclude EXT     Exclude files with extension 'EXT'"
+    echo "  -I EXT, --include EXT     Include files with extension 'EXT'"
+    echo "  -A EXT, --add EXT         Add extension 'EXT' to default list"
+    echo "  -R EXT, --remove EXT      Remove extension 'EXT' from default list"
+    echo "  -l, --list                List current extensions"
+    exit 1
+}
+
+# Function to list current extensions
+list_extensions() {
+    echo "Default extensions: ${EXTENSIONS[*]}"
+    echo "Excluded extensions: ${EXCLUDED[*]:-none}"
+}
+
+# Load configuration
+load_config
+
+# Flag to determine if we should run the combining
+RUN_COMBINE=true
+CONFIG_MODIFIED=false
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_usage
+            ;;
+        -E|--exclude)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: -E/--exclude requires an extension argument"
+                exit 1
+            fi
+            EXCLUDED+=("$2")
+            shift 2
+            ;;
+        -I|--include)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: -I/--include requires an extension argument"
+                exit 1
+            fi
+            # Remove from excluded if it was there
+            for i in "${!EXCLUDED[@]}"; do
+                if [[ "${EXCLUDED[i]}" = "$2" ]]; then
+                    unset 'EXCLUDED[i]'
+                fi
+            done
+            EXCLUDED=("${EXCLUDED[@]}")
+            shift 2
+            ;;
+        -A|--add)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: -A/--add requires an extension argument"
+                exit 1
+            fi
+            if [[ ! " ${EXTENSIONS[*]} " =~ " $2 " ]]; then
+                EXTENSIONS+=("$2")
+                CONFIG_MODIFIED=true
+                echo "Added extension: $2"
+            else
+                echo "Extension $2 is already in the list"
+            fi
+            RUN_COMBINE=false
+            shift 2
+            ;;
+        -R|--remove)
+            if [[ -z "$2" || "$2" == -* ]]; then
+                echo "Error: -R/--remove requires an extension argument"
+                exit 1
+            fi
+            FOUND=false
+            for i in "${!EXTENSIONS[@]}"; do
+                if [[ "${EXTENSIONS[i]}" = "$2" ]]; then
+                    unset 'EXTENSIONS[i]'
+                    FOUND=true
+                    CONFIG_MODIFIED=true
+                    echo "Removed extension: $2"
+                fi
+            done
+            if [ "$FOUND" = false ]; then
+                echo "Extension $2 is not in the list"
+            fi
+            EXTENSIONS=("${EXTENSIONS[@]}")
+            RUN_COMBINE=false
+            shift 2
+            ;;
+        -l|--list)
+            list_extensions
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_usage
+            ;;
+    esac
+done
+
+# Save configuration if modified
+if [ "$CONFIG_MODIFIED" = true ]; then
+    save_config
+    echo "Configuration saved."
+fi
+
+# Exit if we're not supposed to run the combining
+if [ "$RUN_COMBINE" = false ]; then
+    exit 0
+fi
+
+# Create a temporary file
+TEMP_FILE=$(mktemp)
+
+# Run make clean if Makefile exists
+if [ -f "Makefile" ] || [ -f "makefile" ]; then
+    make clean
+fi
+
+# Print directory structure first
+echo "=== Directory Structure ===" > "$TEMP_FILE"
+tree -I "node_modules|.git" >> "$TEMP_FILE"
+echo -e "\n=== Code Files ===\n" >> "$TEMP_FILE"
+
+# Build the find command dynamically
+FIND_CMD="find . -type f \("
+
+# Build the find command with inclusions and exclusions
+first=true
+for ext in "${EXTENSIONS[@]}"; do
+    # Check if the extension should be excluded
+    if [[ ! " ${EXCLUDED[*]} " =~ " ${ext} " ]]; then
+        if [ "$first" = true ]; then
+            FIND_CMD+=" -name \"*.${ext}\""
+            first=false
+        else
+            FIND_CMD+=" -o -name \"*.${ext}\""
+        fi
+    fi
+done
+FIND_CMD+=" \)"
+
+# Find and concatenate all code files
+for file in $(eval "$FIND_CMD"); do
+    echo -e "\n### File: $file ###\n" >> "$TEMP_FILE"
+    cat "$file" >> "$TEMP_FILE"
+    echo -e "\n-------------------\n" >> "$TEMP_FILE"
+done
+
+# Copy the content to clipboard (Linux only)
+if command -v xclip >/dev/null 2>&1; then
+    cat "$TEMP_FILE" | xclip -selection clipboard
+elif command -v xsel >/dev/null 2>&1; then
+    cat "$TEMP_FILE" | xsel --clipboard --input
+else
+    echo "Error: Neither xclip nor xsel is installed. Please install one of them."
+    exit 1
+fi
+
+# Clean up
+rm "$TEMP_FILE"
+
+echo "Content copied to clipboard"
+list_extensions
