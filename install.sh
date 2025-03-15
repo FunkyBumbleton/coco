@@ -1,6 +1,3 @@
-## Installation Script (install.sh)
-
-```bash
 #!/bin/bash
 
 # COCO Installation Script
@@ -42,7 +39,7 @@ if [ -f "coco" ]; then
     cp coco "$INSTALL_DIR/coco"
 else
     # Remote installation
-    curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/coco/main/coco -o "$INSTALL_DIR/coco"
+    curl -sSL https://raw.githubusercontent.com/FunkyBumbleton/coco/main/coco -o "$INSTALL_DIR/coco"
 fi
 
 # Make executable
@@ -57,4 +54,3 @@ fi
 
 echo "COCO has been installed successfully to $INSTALL_DIR/coco"
 echo "Run 'coco --help' to see usage information."
-```
