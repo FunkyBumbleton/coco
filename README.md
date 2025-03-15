@@ -21,13 +21,13 @@ COCO (Code Combiner) is a bash utility that combines all code files in a project
 You can install COCO using the provided installation script:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YOUR_USERNAME/coco/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/FunkyBumbleton/coco/main/install.sh | bash
 
 Or manually:
 
 ```Bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/coco.git
+git clone https://github.com/FunkyBumbleton/coco.git
 
 # Move to a directory in your PATH
 sudo cp coco/coco /usr/local/bin/
