@@ -57,3 +57,4 @@ fi
 
 echo "COCO has been installed successfully to $INSTALL_DIR/coco"
 echo "Run 'coco --help' to see usage information."
+``'
