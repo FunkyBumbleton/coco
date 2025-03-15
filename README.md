@@ -22,6 +22,7 @@ You can install COCO using the provided installation script:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/FunkyBumbleton/coco/main/install.sh | bash
+```
 
 Or manually:
 
